@@ -19,16 +19,14 @@ const shareBtn = document.getElementById("shareBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 const smsBtn = document.getElementById("smsBtn");
 
-let selfieStream = null;
-let selfieTrack = null;
-
-let torchStream = null;
-let torchTrack = null;
-
+let stream = null;
+let track = null;
+let mode = "front";
 let pressStart = 0;
 let timer = null;
 let capturedBlob = null;
 let capturedDataUrl = null;
+let lastSelfieFrame = null;
 
 const moods = {
   calm: { name:"Blue Calm", bg:["#1d4ed8","#60a5fa"] },
@@ -43,11 +41,24 @@ moodSelect.addEventListener("change", () => {
   moodName.textContent = moods[moodSelect.value].name;
 });
 
-async function startCamera(){
-  try{
-    stopCamera();
+function stopCurrentStream(){
+  if(stream){
+    stream.getTracks().forEach(t => t.stop());
+  }
+  stream = null;
+  track = null;
+}
 
-    selfieStream = await navigator.mediaDevices.getUserMedia({
+async function startCamera(){
+  await startFrontCamera();
+}
+
+async function startFrontCamera(){
+  try{
+    stopCurrentStream();
+    mode = "front";
+
+    stream = await navigator.mediaDevices.getUserMedia({
       video:{
         facingMode:{ ideal:"user" },
         width:{ ideal:1280 },
@@ -56,15 +67,14 @@ async function startCamera(){
       audio:false
     });
 
-    video.srcObject = selfieStream;
-    selfieTrack = selfieStream.getVideoTracks()[0];
+    track = stream.getVideoTracks()[0];
+    video.srcObject = stream;
 
     video.classList.remove("hidden");
     preview.classList.add("hidden");
 
-    cameraStatus.innerHTML = "<strong>Status:</strong> Front camera started. Preparing rear flashlight...";
-    await prepareRearTorch();
-
+    torchStatus.textContent = "Rear only";
+    cameraStatus.innerHTML = "<strong>Status:</strong> Front camera ready. Hold button to glow and capture.";
   }catch(err){
     cameraStatus.innerHTML = "<strong>Status:</strong> Front camera blocked/unavailable. Try Live Server.";
     torchStatus.textContent = "Unavailable";
@@ -72,9 +82,12 @@ async function startCamera(){
   }
 }
 
-async function prepareRearTorch(){
+async function startRearTorchCamera(){
   try{
-    torchStream = await navigator.mediaDevices.getUserMedia({
+    stopCurrentStream();
+    mode = "rear";
+
+    stream = await navigator.mediaDevices.getUserMedia({
       video:{
         facingMode:{ ideal:"environment" },
         width:{ ideal:640 },
@@ -83,103 +96,105 @@ async function prepareRearTorch(){
       audio:false
     });
 
-    torchTrack = torchStream.getVideoTracks()[0];
+    track = stream.getVideoTracks()[0];
+    video.srcObject = stream;
 
-    const caps = torchTrack.getCapabilities ? torchTrack.getCapabilities() : {};
+    const caps = track.getCapabilities ? track.getCapabilities() : {};
 
     if(caps.torch){
-      torchStatus.textContent = "Supported";
-      cameraStatus.innerHTML = "<strong>Status:</strong> Front camera ready + rear flashlight supported. Hold button.";
+      await track.applyConstraints({ advanced:[{ torch:true }] });
+      torchStatus.textContent = "On";
+      cameraStatus.innerHTML = "<strong>Status:</strong> Flashlight on while holding.";
     }else{
       torchStatus.textContent = "Not supported";
-      cameraStatus.innerHTML = "<strong>Status:</strong> Front camera ready. Rear flashlight not supported by this browser/device.";
+      cameraStatus.innerHTML = "<strong>Status:</strong> Rear flashlight not supported on this device/browser.";
     }
   }catch(err){
     torchStatus.textContent = "Unavailable";
-    cameraStatus.innerHTML = "<strong>Status:</strong> Front camera ready. Rear flashlight unavailable.";
+    cameraStatus.innerHTML = "<strong>Status:</strong> Rear flashlight unavailable.";
     console.error(err);
   }
 }
 
-function stopCamera(){
-  if(selfieStream){
-    selfieStream.getTracks().forEach(track => track.stop());
+async function turnTorchOff(){
+  try{
+    if(track && mode === "rear"){
+      const caps = track.getCapabilities ? track.getCapabilities() : {};
+      if(caps.torch){
+        await track.applyConstraints({ advanced:[{ torch:false }] });
+      }
+    }
+  }catch(err){
+    console.error(err);
   }
-
-  if(torchStream){
-    torchStream.getTracks().forEach(track => track.stop());
-  }
-
-  selfieStream = null;
-  selfieTrack = null;
-  torchStream = null;
-  torchTrack = null;
-
   torchStatus.textContent = "Off";
 }
 
-async function setTorch(on){
-  try{
-    if(!torchTrack){
-      torchStatus.textContent = "Unavailable";
-      return;
-    }
-
-    const caps = torchTrack.getCapabilities ? torchTrack.getCapabilities() : {};
-
-    if(!caps.torch){
-      torchStatus.textContent = "Not supported";
-      return;
-    }
-
-    await torchTrack.applyConstraints({
-      advanced:[{ torch:on }]
-    });
-
-    torchStatus.textContent = on ? "On" : "Off";
-  }catch(err){
-    torchStatus.textContent = "Blocked";
-    console.error(err);
-  }
+function stopCamera(){
+  stopCurrentStream();
+  torchStatus.textContent = "Off";
+  cameraStatus.innerHTML = "<strong>Status:</strong> Camera stopped.";
 }
 
-function startPress(){
-  if(!selfieStream){
+function saveSelfieFrameBeforeSwitch(){
+  const w = video.videoWidth || 640;
+  const h = video.videoHeight || 480;
+
+  const temp = document.createElement("canvas");
+  temp.width = w;
+  temp.height = h;
+  const tctx = temp.getContext("2d");
+
+  // Mirror selfie frame
+  tctx.translate(w, 0);
+  tctx.scale(-1, 1);
+  tctx.drawImage(video, 0, 0, w, h);
+
+  lastSelfieFrame = temp;
+}
+
+async function startPress(){
+  if(!stream || mode !== "front"){
     cameraStatus.innerHTML = "<strong>Status:</strong> Start front camera first.";
     return;
   }
 
-  pressStart = Date.now();
+  saveSelfieFrameBeforeSwitch();
 
-  setTorch(true);
+  pressStart = Date.now();
+  pressBtn.textContent = "Release to Capture";
 
   timer = setInterval(() => {
     const seconds = (Date.now() - pressStart) / 1000;
     holdTime.textContent = seconds.toFixed(1) + "s";
   }, 100);
 
-  pressBtn.textContent = "Release to Capture";
+  await startRearTorchCamera();
 }
 
 async function endPress(){
-  if(!selfieStream || !pressStart) return;
+  if(!pressStart) return;
 
   clearInterval(timer);
   timer = null;
 
-  await setTorch(false);
+  await turnTorchOff();
 
   pressBtn.textContent = "Hold to Send Feeling";
 
   captureMoodPhoto();
   pressStart = 0;
+
+  // Return to front camera after capture.
+  await startFrontCamera();
 }
 
 function captureMoodPhoto(){
   const mood = moods[moodSelect.value];
 
-  const w = video.videoWidth || 640;
-  const h = video.videoHeight || 480;
+  const source = lastSelfieFrame || video;
+  const w = source.width || video.videoWidth || 640;
+  const h = source.height || video.videoHeight || 480;
 
   canvas.width = w;
   canvas.height = h;
@@ -197,18 +212,7 @@ function captureMoodPhoto(){
   ctx.save();
   roundRect(ctx, padding, padding, w - padding * 2, h - padding * 2, 32);
   ctx.clip();
-
-  ctx.translate(w, 0);
-  ctx.scale(-1, 1);
-
-  ctx.drawImage(
-    video,
-    padding,
-    padding,
-    w - padding * 2,
-    h - padding * 2
-  );
-
+  ctx.drawImage(source, padding, padding, w - padding * 2, h - padding * 2);
   ctx.restore();
 
   ctx.fillStyle = "rgba(0,0,0,.45)";
@@ -232,9 +236,8 @@ function captureMoodPhoto(){
 
   preview.src = capturedDataUrl;
   preview.classList.remove("hidden");
-  video.classList.add("hidden");
 
-  cameraStatus.innerHTML = "<strong>Status:</strong> Selfie mood photo captured. Rear flashlight turned off.";
+  cameraStatus.innerHTML = "<strong>Status:</strong> Mood photo captured. Returning to front camera.";
 }
 
 function roundRect(ctx, x, y, w, h, r){
@@ -254,9 +257,7 @@ function roundRect(ctx, x, y, w, h, r){
 async function sharePhoto(){
   if(!capturedBlob) return;
 
-  const file = new File([capturedBlob], "app-press-mood.png", {
-    type:"image/png"
-  });
+  const file = new File([capturedBlob], "app-press-mood.png", { type:"image/png" });
 
   if(navigator.canShare && navigator.canShare({ files:[file] })){
     await navigator.share({
