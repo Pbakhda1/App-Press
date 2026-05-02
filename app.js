@@ -4,6 +4,7 @@ const preview = document.getElementById("preview");
 
 const startCameraBtn = document.getElementById("startCameraBtn");
 const stopCameraBtn = document.getElementById("stopCameraBtn");
+const takeSelfieBtn = document.getElementById("takeSelfieBtn");
 const pressBtn = document.getElementById("pressBtn");
 
 const phoneNumber = document.getElementById("phoneNumber");
@@ -26,7 +27,6 @@ let pressStart = 0;
 let timer = null;
 let capturedBlob = null;
 let capturedDataUrl = null;
-let lastSelfieFrame = null;
 
 const moods = {
   calm: { name:"Blue Calm", bg:["#1d4ed8","#60a5fa"] },
@@ -49,21 +49,13 @@ function stopCurrentStream(){
   track = null;
 }
 
-async function startCamera(){
-  await startFrontCamera();
-}
-
 async function startFrontCamera(){
   try{
     stopCurrentStream();
     mode = "front";
 
     stream = await navigator.mediaDevices.getUserMedia({
-      video:{
-        facingMode:{ ideal:"user" },
-        width:{ ideal:1280 },
-        height:{ ideal:720 }
-      },
+      video:{ facingMode:{ ideal:"user" }, width:{ ideal:1280 }, height:{ ideal:720 } },
       audio:false
     });
 
@@ -74,25 +66,20 @@ async function startFrontCamera(){
     preview.classList.add("hidden");
 
     torchStatus.textContent = "Rear only";
-    cameraStatus.innerHTML = "<strong>Status:</strong> Front camera ready. Hold button to glow and capture.";
+    cameraStatus.innerHTML = "<strong>Status:</strong> Front camera ready. Tap Take Selfie First.";
   }catch(err){
-    cameraStatus.innerHTML = "<strong>Status:</strong> Front camera blocked/unavailable. Try Live Server.";
-    torchStatus.textContent = "Unavailable";
+    cameraStatus.innerHTML = "<strong>Status:</strong> Front camera blocked/unavailable.";
     console.error(err);
   }
 }
 
-async function startRearTorchCamera(){
+async function startRearFlashlight(){
   try{
     stopCurrentStream();
     mode = "rear";
 
     stream = await navigator.mediaDevices.getUserMedia({
-      video:{
-        facingMode:{ ideal:"environment" },
-        width:{ ideal:640 },
-        height:{ ideal:480 }
-      },
+      video:{ facingMode:{ ideal:"environment" }, width:{ ideal:640 }, height:{ ideal:480 } },
       audio:false
     });
 
@@ -107,7 +94,7 @@ async function startRearTorchCamera(){
       cameraStatus.innerHTML = "<strong>Status:</strong> Flashlight on while holding.";
     }else{
       torchStatus.textContent = "Not supported";
-      cameraStatus.innerHTML = "<strong>Status:</strong> Rear flashlight not supported on this device/browser.";
+      cameraStatus.innerHTML = "<strong>Status:</strong> Flashlight not supported on this phone/browser.";
     }
   }catch(err){
     torchStatus.textContent = "Unavailable";
@@ -116,7 +103,7 @@ async function startRearTorchCamera(){
   }
 }
 
-async function turnTorchOff(){
+async function turnFlashlightOff(){
   try{
     if(track && mode === "rear"){
       const caps = track.getCapabilities ? track.getCapabilities() : {};
@@ -127,7 +114,9 @@ async function turnTorchOff(){
   }catch(err){
     console.error(err);
   }
+
   torchStatus.textContent = "Off";
+  stopCurrentStream();
 }
 
 function stopCamera(){
@@ -136,65 +125,21 @@ function stopCamera(){
   cameraStatus.innerHTML = "<strong>Status:</strong> Camera stopped.";
 }
 
-function saveSelfieFrameBeforeSwitch(){
-  const w = video.videoWidth || 640;
-  const h = video.videoHeight || 480;
-
-  const temp = document.createElement("canvas");
-  temp.width = w;
-  temp.height = h;
-  const tctx = temp.getContext("2d");
-
-  // Mirror selfie frame
-  tctx.translate(w, 0);
-  tctx.scale(-1, 1);
-  tctx.drawImage(video, 0, 0, w, h);
-
-  lastSelfieFrame = temp;
-}
-
-async function startPress(){
+function takeSelfie(){
   if(!stream || mode !== "front"){
     cameraStatus.innerHTML = "<strong>Status:</strong> Start front camera first.";
     return;
   }
 
-  saveSelfieFrameBeforeSwitch();
-
-  pressStart = Date.now();
-  pressBtn.textContent = "Release to Capture";
-
-  timer = setInterval(() => {
-    const seconds = (Date.now() - pressStart) / 1000;
-    holdTime.textContent = seconds.toFixed(1) + "s";
-  }, 100);
-
-  await startRearTorchCamera();
-}
-
-async function endPress(){
-  if(!pressStart) return;
-
-  clearInterval(timer);
-  timer = null;
-
-  await turnTorchOff();
-
-  pressBtn.textContent = "Hold to Send Feeling";
-
   captureMoodPhoto();
-  pressStart = 0;
-
-  // Return to front camera after capture.
-  await startFrontCamera();
+  cameraStatus.innerHTML = "<strong>Status:</strong> Selfie saved. Now hold Flashlight Glow.";
 }
 
 function captureMoodPhoto(){
   const mood = moods[moodSelect.value];
 
-  const source = lastSelfieFrame || video;
-  const w = source.width || video.videoWidth || 640;
-  const h = source.height || video.videoHeight || 480;
+  const w = video.videoWidth || 640;
+  const h = video.videoHeight || 480;
 
   canvas.width = w;
   canvas.height = h;
@@ -212,7 +157,11 @@ function captureMoodPhoto(){
   ctx.save();
   roundRect(ctx, padding, padding, w - padding * 2, h - padding * 2, 32);
   ctx.clip();
-  ctx.drawImage(source, padding, padding, w - padding * 2, h - padding * 2);
+
+  ctx.translate(w, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, padding, padding, w - padding * 2, h - padding * 2);
+
   ctx.restore();
 
   ctx.fillStyle = "rgba(0,0,0,.45)";
@@ -236,22 +185,46 @@ function captureMoodPhoto(){
 
   preview.src = capturedDataUrl;
   preview.classList.remove("hidden");
-
-  cameraStatus.innerHTML = "<strong>Status:</strong> Mood photo captured. Returning to front camera.";
 }
 
 function roundRect(ctx, x, y, w, h, r){
   ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);
   ctx.closePath();
+}
+
+async function startPress(){
+  pressStart = Date.now();
+
+  timer = setInterval(() => {
+    const seconds = (Date.now() - pressStart) / 1000;
+    holdTime.textContent = seconds.toFixed(1) + "s";
+  }, 100);
+
+  pressBtn.textContent = "Release to Turn Off";
+  await startRearFlashlight();
+}
+
+async function endPress(){
+  if(!pressStart) return;
+
+  clearInterval(timer);
+  timer = null;
+
+  await turnFlashlightOff();
+
+  pressBtn.textContent = "Hold Flashlight Glow";
+  pressStart = 0;
+
+  cameraStatus.innerHTML = "<strong>Status:</strong> Flashlight glow ended.";
 }
 
 async function sharePhoto(){
@@ -272,7 +245,6 @@ async function sharePhoto(){
 
 function downloadPhoto(){
   if(!capturedDataUrl) return;
-
   const a = document.createElement("a");
   a.href = capturedDataUrl;
   a.download = "app-press-mood.png";
@@ -284,7 +256,7 @@ function openSmsDraft(){
 
   const msg = encodeURIComponent(
     (messageText.value || "Thinking of you ❤️") +
-    "\n\nI sent you an App-Press mood glow. Open App-Press on your phone, tap Start Camera, then hold the button to turn on your own flashlight and glow back to me."
+    "\n\nI sent you an App-Press mood glow. Open App-Press and hold your Flashlight Glow button to glow back."
   );
 
   if(!num){
@@ -295,20 +267,21 @@ function openSmsDraft(){
   window.location.href = `sms:${num}?&body=${msg}`;
 }
 
-startCameraBtn.addEventListener("click", startCamera);
+startCameraBtn.addEventListener("click", startFrontCamera);
 stopCameraBtn.addEventListener("click", stopCamera);
+takeSelfieBtn.addEventListener("click", takeSelfie);
 
 pressBtn.addEventListener("mousedown", startPress);
 pressBtn.addEventListener("mouseup", endPress);
 pressBtn.addEventListener("mouseleave", endPress);
 
-pressBtn.addEventListener("touchstart", event => {
-  event.preventDefault();
+pressBtn.addEventListener("touchstart", e => {
+  e.preventDefault();
   startPress();
 }, { passive:false });
 
-pressBtn.addEventListener("touchend", event => {
-  event.preventDefault();
+pressBtn.addEventListener("touchend", e => {
+  e.preventDefault();
   endPress();
 }, { passive:false });
 
