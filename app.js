@@ -47,7 +47,6 @@ async function startCamera(){
   try{
     stopCamera();
 
-    // Front camera for selfie photo
     selfieStream = await navigator.mediaDevices.getUserMedia({
       video:{
         facingMode:{ ideal:"user" },
@@ -75,8 +74,6 @@ async function startCamera(){
 
 async function prepareRearTorch(){
   try{
-    // Rear camera is only used for torch/flashlight.
-    // This may fail on iPhone Safari or some browsers.
     torchStream = await navigator.mediaDevices.getUserMedia({
       video:{
         facingMode:{ ideal:"environment" },
@@ -154,7 +151,6 @@ function startPress(){
 
   pressStart = Date.now();
 
-  // Turns rear flashlight ON while button is held.
   setTorch(true);
 
   timer = setInterval(() => {
@@ -171,7 +167,6 @@ async function endPress(){
   clearInterval(timer);
   timer = null;
 
-  // Turns rear flashlight OFF when released.
   await setTorch(false);
 
   pressBtn.textContent = "Hold to Send Feeling";
@@ -203,7 +198,6 @@ function captureMoodPhoto(){
   roundRect(ctx, padding, padding, w - padding * 2, h - padding * 2, 32);
   ctx.clip();
 
-  // Mirror selfie capture so it looks like front-camera view.
   ctx.translate(w, 0);
   ctx.scale(-1, 1);
 
@@ -286,9 +280,10 @@ function downloadPhoto(){
 
 function openSmsDraft(){
   const num = phoneNumber.value.trim();
+
   const msg = encodeURIComponent(
     (messageText.value || "Thinking of you ❤️") +
-    " Open App-Press and hold your button to glow back."
+    "\n\nI sent you an App-Press mood glow. Open App-Press on your phone, tap Start Camera, then hold the button to turn on your own flashlight and glow back to me."
   );
 
   if(!num){
