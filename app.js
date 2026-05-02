@@ -45,7 +45,7 @@ async function startCamera(){
 
     stream = await navigator.mediaDevices.getUserMedia({
       video: {
-        facingMode: { ideal: "environment" },
+        facingMode: { ideal: "user" },
         width: { ideal: 1280 },
         height: { ideal: 720 }
       },
@@ -58,10 +58,10 @@ async function startCamera(){
     video.classList.remove("hidden");
     preview.classList.add("hidden");
 
-    cameraStatus.innerHTML = "<strong>Status:</strong> Rear camera started. Hold the button to turn flashlight on.";
+    cameraStatus.innerHTML = "<strong>Status:</strong> Front camera started. Hold the button to capture your mood photo.";
     await checkTorch();
   }catch(err){
-    cameraStatus.innerHTML = "<strong>Status:</strong> Camera blocked/unavailable. Use Android Chrome or try Live Server.";
+    cameraStatus.innerHTML = "<strong>Status:</strong> Front camera blocked or unavailable. Try Live Server.";
     torchStatus.textContent = "Unavailable";
     console.error(err);
   }
@@ -78,16 +78,16 @@ function stopCamera(){
 
 async function checkTorch(){
   try{
-    const caps = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+    const caps = videoTrack && videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
     if(caps.torch){
       torchStatus.textContent = "Supported";
       return true;
     }else{
-      torchStatus.textContent = "Not supported";
+      torchStatus.textContent = "Not supported on front camera";
       return false;
     }
   }catch{
-    torchStatus.textContent = "Not supported";
+    torchStatus.textContent = "Not supported on front camera";
     return false;
   }
 }
@@ -98,8 +98,7 @@ async function setTorch(on){
 
     const caps = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
     if(!caps.torch){
-      torchStatus.textContent = "Not supported";
-      cameraStatus.innerHTML = "<strong>Status:</strong> Flashlight not supported on this device/browser.";
+      torchStatus.textContent = "Not supported on front camera";
       return;
     }
 
@@ -110,7 +109,6 @@ async function setTorch(on){
     torchStatus.textContent = on ? "On" : "Off";
   }catch(err){
     torchStatus.textContent = "Blocked";
-    cameraStatus.innerHTML = "<strong>Status:</strong> Flashlight blocked. Try Android Chrome with rear camera.";
     console.error(err);
   }
 }
@@ -163,10 +161,16 @@ function captureMoodPhoto(){
   ctx.fillRect(0,0,w,h);
 
   const padding = Math.round(w * 0.06);
+
   ctx.save();
-  roundRect(ctx, padding, padding, w - padding*2, h - padding*2, 32);
+  roundRect(ctx, padding, padding, w - padding * 2, h - padding * 2, 32);
   ctx.clip();
-  ctx.drawImage(video, padding, padding, w - padding*2, h - padding*2);
+
+  // Mirror front camera capture so it feels like selfie view
+  ctx.translate(w, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, padding, padding, w - padding * 2, h - padding * 2);
+
   ctx.restore();
 
   ctx.fillStyle = "rgba(0,0,0,.45)";
@@ -192,7 +196,7 @@ function captureMoodPhoto(){
   preview.classList.remove("hidden");
   video.classList.add("hidden");
 
-  cameraStatus.innerHTML = "<strong>Status:</strong> Mood photo captured. Flashlight turned off.";
+  cameraStatus.innerHTML = "<strong>Status:</strong> Mood photo captured with front camera.";
 }
 
 function roundRect(ctx, x, y, w, h, r){
