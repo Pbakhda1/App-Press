@@ -27,6 +27,11 @@ let pressStart = 0;
 let timer = null;
 let capturedBlob = null;
 let capturedDataUrl = null;
+let savedSelfieCanvas = null;
+
+video.setAttribute("playsinline", true);
+video.setAttribute("muted", true);
+video.muted = true;
 
 const moods = {
   calm: { name:"Blue Calm", bg:["#1d4ed8","#60a5fa"] },
@@ -45,8 +50,26 @@ function stopCurrentStream(){
   if(stream){
     stream.getTracks().forEach(t => t.stop());
   }
+
   stream = null;
   track = null;
+  video.srcObject = null;
+}
+
+async function attachStream(newStream){
+  stream = newStream;
+  track = stream.getVideoTracks()[0];
+  video.srcObject = stream;
+
+  await new Promise(resolve => {
+    video.onloadedmetadata = resolve;
+  });
+
+  try{
+    await video.play();
+  }catch(err){
+    console.error("Video play error:", err);
+  }
 }
 
 async function startFrontCamera(){
@@ -54,13 +77,16 @@ async function startFrontCamera(){
     stopCurrentStream();
     mode = "front";
 
-    stream = await navigator.mediaDevices.getUserMedia({
-      video:{ facingMode:{ ideal:"user" }, width:{ ideal:1280 }, height:{ ideal:720 } },
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video:{
+        facingMode:"user",
+        width:{ ideal:1280 },
+        height:{ ideal:720 }
+      },
       audio:false
     });
 
-    track = stream.getVideoTracks()[0];
-    video.srcObject = stream;
+    await attachStream(newStream);
 
     video.classList.remove("hidden");
     preview.classList.add("hidden");
@@ -68,7 +94,7 @@ async function startFrontCamera(){
     torchStatus.textContent = "Rear only";
     cameraStatus.innerHTML = "<strong>Status:</strong> Front camera ready. Tap Take Selfie First.";
   }catch(err){
-    cameraStatus.innerHTML = "<strong>Status:</strong> Front camera blocked/unavailable.";
+    cameraStatus.innerHTML = "<strong>Status:</strong> Camera blocked or unavailable. Use Live Server / HTTPS.";
     console.error(err);
   }
 }
@@ -78,13 +104,16 @@ async function startRearFlashlight(){
     stopCurrentStream();
     mode = "rear";
 
-    stream = await navigator.mediaDevices.getUserMedia({
-      video:{ facingMode:{ ideal:"environment" }, width:{ ideal:640 }, height:{ ideal:480 } },
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video:{
+        facingMode:"environment",
+        width:{ ideal:640 },
+        height:{ ideal:480 }
+      },
       audio:false
     });
 
-    track = stream.getVideoTracks()[0];
-    video.srcObject = stream;
+    await attachStream(newStream);
 
     const caps = track.getCapabilities ? track.getCapabilities() : {};
 
@@ -131,15 +160,29 @@ function takeSelfie(){
     return;
   }
 
-  captureMoodPhoto();
+  const w = video.videoWidth || 640;
+  const h = video.videoHeight || 480;
+
+  savedSelfieCanvas = document.createElement("canvas");
+  savedSelfieCanvas.width = w;
+  savedSelfieCanvas.height = h;
+
+  const ctx = savedSelfieCanvas.getContext("2d");
+
+  ctx.translate(w, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, w, h);
+
+  captureMoodPhoto(savedSelfieCanvas);
+
   cameraStatus.innerHTML = "<strong>Status:</strong> Selfie saved. Now hold Flashlight Glow.";
 }
 
-function captureMoodPhoto(){
+function captureMoodPhoto(source){
   const mood = moods[moodSelect.value];
 
-  const w = video.videoWidth || 640;
-  const h = video.videoHeight || 480;
+  const w = source.width || 640;
+  const h = source.height || 480;
 
   canvas.width = w;
   canvas.height = h;
@@ -157,11 +200,7 @@ function captureMoodPhoto(){
   ctx.save();
   roundRect(ctx, padding, padding, w - padding * 2, h - padding * 2, 32);
   ctx.clip();
-
-  ctx.translate(w, 0);
-  ctx.scale(-1, 1);
-  ctx.drawImage(video, padding, padding, w - padding * 2, h - padding * 2);
-
+  ctx.drawImage(source, padding, padding, w - padding * 2, h - padding * 2);
   ctx.restore();
 
   ctx.fillStyle = "rgba(0,0,0,.45)";
@@ -202,6 +241,11 @@ function roundRect(ctx, x, y, w, h, r){
 }
 
 async function startPress(){
+  if(!savedSelfieCanvas){
+    cameraStatus.innerHTML = "<strong>Status:</strong> Take Selfie First before using flashlight.";
+    return;
+  }
+
   pressStart = Date.now();
 
   timer = setInterval(() => {
@@ -224,7 +268,10 @@ async function endPress(){
   pressBtn.textContent = "Hold Flashlight Glow";
   pressStart = 0;
 
-  cameraStatus.innerHTML = "<strong>Status:</strong> Flashlight glow ended.";
+  preview.classList.remove("hidden");
+  video.classList.add("hidden");
+
+  cameraStatus.innerHTML = "<strong>Status:</strong> Flashlight glow ended. Selfie is saved and viewable.";
 }
 
 async function sharePhoto(){
@@ -245,6 +292,7 @@ async function sharePhoto(){
 
 function downloadPhoto(){
   if(!capturedDataUrl) return;
+
   const a = document.createElement("a");
   a.href = capturedDataUrl;
   a.download = "app-press-mood.png";
