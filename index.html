@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>App-Press</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="container topbar-inner">
+    <div class="brand">
+      <div class="logo">AP</div>
+      <div>
+        <div class="brand-name">App-Press</div>
+        <div class="brand-tag">Hold • Glow • Capture • Share</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="#app">Try App</a>
+      <a href="#moods">Moods</a>
+      <a href="#rules">Rules</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="container hero-grid">
+      <div>
+        <h1>Send a “thinking of you” moment with one press.</h1>
+        <p class="subhead">
+          App-Press is a mood-ring style camera concept. Hold the button, capture your moment,
+          choose a mood color, and share it with someone special.
+        </p>
+        <div class="cta-row">
+          <a class="btn primary" href="#app">Try Demo</a>
+          <a class="btn ghost" href="#moods">View Moods</a>
+        </div>
+        <div class="creator">Created by <strong>Parth Pankaj Bakhda</strong></div>
+      </div>
+
+      <div class="hero-card">
+        <div class="card-title">What this demo does</div>
+        <ul>
+          <li>Uses your camera</li>
+          <li>Press-and-hold capture button</li>
+          <li>Attempts flashlight/torch where supported</li>
+          <li>Adds mood color background</li>
+          <li>Creates share/download/message options</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="app" class="section section-alt">
+    <div class="container">
+      <div class="section-head">
+        <h2>App-Press Demo</h2>
+        <p>Start the camera, choose a mood, add a loved one’s number, then press and hold.</p>
+      </div>
+
+      <div class="workspace">
+        <div class="panel">
+          <div class="panel-title">Camera</div>
+          <div class="camera-wrap">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas" class="hidden"></canvas>
+            <img id="preview" class="hidden" alt="Captured mood photo" />
+          </div>
+
+          <div class="control-row">
+            <button class="btn primary" id="startCameraBtn">Start Camera</button>
+            <button class="btn" id="stopCameraBtn">Stop Camera</button>
+          </div>
+
+          <button class="press-btn" id="pressBtn">
+            Hold to Send Feeling
+          </button>
+
+          <div class="callout" id="cameraStatus">
+            <strong>Status:</strong> Start camera first.
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Mood + Loved One</div>
+
+          <label class="label">Loved one phone number</label>
+          <input id="phoneNumber" placeholder="Example: 4805551234" />
+
+          <label class="label">Your message</label>
+          <input id="messageText" value="Thinking of you ❤️" />
+
+          <label class="label">Choose mood</label>
+          <select id="moodSelect">
+            <option value="calm">Blue Calm</option>
+            <option value="love">Pink Love</option>
+            <option value="happy">Yellow Happy</option>
+            <option value="angry">Red Intense</option>
+            <option value="peace">Green Peace</option>
+            <option value="dream">Purple Dream</option>
+          </select>
+
+          <div class="summary-box">
+            <div><span>Hold Time:</span> <strong id="holdTime">0.0s</strong></div>
+            <div><span>Mood:</span> <strong id="moodName">Blue Calm</strong></div>
+            <div><span>Torch:</span> <strong id="torchStatus">Not tested</strong></div>
+          </div>
+
+          <div class="control-row">
+            <button class="btn primary" id="shareBtn" disabled>Share Photo</button>
+            <button class="btn" id="downloadBtn" disabled>Download Photo</button>
+            <button class="btn" id="smsBtn" disabled>Open Text Draft</button>
+          </div>
+
+          <div class="callout">
+            <strong>Note:</strong> A website cannot automatically text a photo. It can open a draft or use your phone’s share menu.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="moods" class="section">
+    <div class="container">
+      <div class="section-head">
+        <h2>Mood Colors</h2>
+        <p>Each captured photo gets a color mood frame.</p>
+      </div>
+
+      <div class="mood-grid">
+        <div class="mood calm">Blue Calm</div>
+        <div class="mood love">Pink Love</div>
+        <div class="mood happy">Yellow Happy</div>
+        <div class="mood angry">Red Intense</div>
+        <div class="mood peace">Green Peace</div>
+        <div class="mood dream">Purple Dream</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="rules" class="section section-alt">
+    <div class="container">
+      <div class="section-head">
+        <h2>Rules</h2>
+      </div>
+
+      <div class="rules-grid">
+        <div class="panel">
+          <h3>Allowed</h3>
+          <p>Use your own camera, your own photo, and send only to people who want to receive it.</p>
+        </div>
+        <div class="panel">
+          <h3>Privacy</h3>
+          <p>Ask permission before photographing others. Do not use this to secretly capture people.</p>
+        </div>
+        <div class="panel">
+          <h3>Safety</h3>
+          <p>Do not shine flashlight into eyes. Torch support depends on the phone/browser.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div>
+        <div class="footer-brand">App-Press</div>
+        <div class="footer-sub">Created by Parth Pankaj Bakhda</div>
+      </div>
+    </div>
+  </footer>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
